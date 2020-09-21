@@ -18,7 +18,7 @@ pygame.display.set_icon(icon)
 #background image and sound
 bg= pygame.image.load("space.jpg")
 mixer.music.load("background.mp3")
-mixer.music.play(-1)
+#mixer.music.play(-1)
 
 #texts
 over_text= pygame.font.Font('freesansbold.ttf', 70)
@@ -246,6 +246,7 @@ def save_ships():
      f=open("shops.csv","w")
      w=csv.DictWriter(f,{"selected","bought"})
      w.writerow({"selected":ships["selected"],"bought":ships["bought"]})
+     
 #Reward
 rewardimg=pygame.image.load("money.png")
 reward_state="ready"
@@ -268,7 +269,49 @@ def reward_collision():
           rewardY=0
           rewardX=0
           reward_state="ready"
-          
+
+#Blast power
+num_enemy=6
+power_state=100
+def blast():
+     global power_state,score
+     power_state=power_state-20
+     for i in range(num_enemy):
+          if enemyY[i]>350:
+               score += 1
+               enemyX[i]= random.randint(0, 735)
+               enemyY[i] = random.randint(40, 150)
+               power_state+=1
+               enemy(enemyX[i],enemyY[i],i)
+
+#machine gun power
+smg_state=0
+def smg():
+     global power_state,bulletY_change,smg_state,bulletimg1,bulletimg2,bulletimg3,bulletimg
+     smg_state=1000
+     power_state=power_state-40
+     bulletY_change=20
+     bulletimg1 = pygame.image.load("smg.png")
+     bulletimg3 = pygame.image.load("smg.png")
+     bulletimg2 = pygame.image.load("smg.png")
+     bulletimg=["",bulletimg1,bulletimg2,bulletimg3]
+def not_smg():
+     global power_state,bulletY_change,bulletimg1,bulletimg2,bulletimg3,bulletimg
+     bulletY_change=10
+     bulletimg1 = pygame.image.load("bullet.png")
+     bulletimg2 = pygame.image.load("bullet.png")
+     bulletimg3 = pygame.image.load("bullet.png")
+     bulletimg=["",bulletimg1,bulletimg2,bulletimg3]
+
+#shotgun
+shotgun_state=0
+bulletimg2 = pygame.image.load("bullet.png")
+bulletimg3 = pygame.image.load("bullet.png")
+def shotgun():
+     global power_state,shotgun_state
+     power_state=power_state-30
+     shotgun_state=1000
+
 #Enemy
 enemyimg = [ ]
 enemyX = [ ]
@@ -288,15 +331,16 @@ def enemy(x , y, i):
      screen.blit(enemyimg[i] , (x, y))
 
 #bullet (Ready = can't see bulet and Fire = bullet current moving)
-bulletimg = pygame.image.load("bullet.png")
-bulletX= 0
-bulletY = 480
+bulletimg1 = pygame.image.load("bullet.png")
+bulletX=[0,0,0,0]
+bulletY =[480,480,480,480]
 bulletY_change = 10
-bullet_state = "ready"
-def fire (x, y):
+bullet_state =["ready","ready","ready","ready"]
+bulletimg=["",bulletimg1,bulletimg2,bulletimg3]
+def fire (x, y,p,i):
      global bullet_state
-     bullet_state = "fire"
-     screen.blit(bulletimg, (x+16, y+10))
+     bullet_state[i] = "fire"
+     screen.blit(p, (x+16, y+10))
 
 #Collision
 def collision (enemyX, enemyY, bulletX , bulletY):
@@ -379,10 +423,48 @@ while run:
      if keys[pygame.K_RIGHT] and playerX<736 :
           playerX += vel
      if keys[pygame.K_SPACE]:
-          if bullet_state is "ready" :
-               # current coordinate of spaceship
-               bulletX = playerX
-               fire(bulletX, bulletY)
+          if shotgun_state>0:
+               if bullet_state==["ready","ready","ready","ready"]:
+                    for p in range(1,4):                         
+                         if smg_state==0:
+                              bulletX[p] = playerX
+                         elif smg_state>0:
+                              bulletX[p]=playerX-47
+                              bulletY[p]=playerY-30
+                         fire(bulletX[p],bulletY[p],bulletimg[p],p)
+          else:
+               if bullet_state[1] is "ready" :
+                    # current coordinate of spaceship
+                    if smg_state==0:
+                         bulletX[1] = playerX
+                    elif smg_state>0:
+                         bulletX[1]=playerX-47
+                         bulletY[1]=playerY-30
+                    fire(bulletX[1], bulletY[1],bulletimg1,1)
+     if keys[pygame.K_b] :
+          if power_state>=20:
+               blast()
+     if keys[pygame.K_n] and smg_state==0:
+          if power_state>=40:
+               smg()
+     if keys[pygame.K_s] and shotgun_state==0:
+          if power_state>=30:
+               shotgun()
+               
+     #smg timer
+     if smg_state>0:
+          smg_state=smg_state-1
+     elif smg_state==0:
+          not_smg()
+
+     #shotgun timer
+     if shotgun_state>0:
+          shotgun_state=shotgun_state-1
+     elif shotgun_state==0:
+          bullet_state[2]="ready"
+          bullet_state[3]="ready"
+          bulletY[2]=480
+          bulletY[3]=480
           
      # enemy movement
      for i in range(num_enemy):
@@ -402,26 +484,46 @@ while run:
                X_change[i] = -3
                enemyY[i] = enemyY[i] + Y_change[i]
           #collision check
-          collisions = collision (enemyX[i] , enemyY[i] , bulletX , bulletY)
-          if collisions:
-               bulletY = 480
-               bullet_state = "ready"
-               score += 1
-               reward()
-               enemyX[i]= random.randint(0, 735)
-               enemyY[i] = random.randint(40, 150)
+          for j in range(1,4):
+               collisions = collision (enemyX[i] , enemyY[i] , bulletX[j] , bulletY[j])
+               if collisions:
+                    bulletY[j] = 480
+                    bullet_state[j] = "ready"
+                    score += 1
+                    power_state+=1
+                    reward()
+                    enemyX[i]= random.randint(0, 735)
+                    enemyY[i] = random.randint(40, 150)
 
           enemy(enemyX[i], enemyY[i], i)
      reward_collision()
      
      # Bullet movement
-     if bullet_state is "fire":
-          fire(bulletX, bulletY)
-          bulletY -= bulletY_change
-     if bulletY <= 0:
-          bulletY = 480
-          bullet_state = "ready"
-
+     for q in range(1,4):
+          if q==1:
+               if bullet_state[1] is "fire":
+                    fire(bulletX[1], bulletY[1],bulletimg[1],1)
+                    bulletY[1] -= bulletY_change
+               if bulletY[1] <= 0:
+                    bulletY[1] = 480
+                    bullet_state[1] = "ready"
+          if q==2 and shotgun_state>0:
+               if bullet_state[2] is "fire":
+                    bulletY[2] -= bulletY_change
+                    bulletX[2] -=bulletY_change/2
+                    fire(bulletX[2], bulletY[2],bulletimg[2],2)
+               if bulletY[2] <= 0 or bulletX[2]<=0:
+                    bulletY[2] = 480
+                    bullet_state[2] = "ready"
+          if q==3 and shotgun_state>0:
+               if bullet_state[3] is "fire":
+                    bulletY[3] -= bulletY_change
+                    bulletX[3] +=bulletY_change/2
+                    fire(bulletX[3], bulletY[3],bulletimg[3],3)
+               if bulletY[3] <= 0 or bulletX[3]>=735:
+                    bulletY[3] = 480
+                    bullet_state[3] = "ready"
+                    
      # Reward movement
      if reward_state is "fire":
           rewardY+=rewardY_change
